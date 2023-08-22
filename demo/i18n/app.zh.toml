@@ -1,0 +1,6 @@
+[MainWindow]
+Title = "Fyne Widget 演示"
+
+[MainWindow.Tab]
+Layout = "布局"
+Inspector = "检视窗"

@@ -1,0 +1,7 @@
+[ROOT]
+Level = "Info"
+Output = "Console"
+FileInfo = true
+
+[Workspace]
+Level = "Debug"
