@@ -2,8 +2,8 @@ package main
 
 import (
 	"fyne_widget"
-	goapp_fyne "fyne_widgets"
 	"goapp_commons"
+	"goapp_fyne"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"

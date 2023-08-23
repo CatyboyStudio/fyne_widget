@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"fyne_widget"
 	"fyne_widget/inspector"
-	goapp_fyne "fyne_widgets"
+	"goapp_fyne"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -19,14 +18,20 @@ func (this *DemoWindow) build_Tab_Inspector() fyne.CanvasObject {
 	return split
 }
 
+type Test1 struct {
+	A int
+	B string
+	C bool
+}
+
 func (this *DemoWindow) build_Tab_Inspector_Content(insp *inspector.Inspector) fyne.CanvasObject {
 	l := container.NewGridWrap(fyne.NewSize(200, 100))
 	c1 := canvas.NewRectangle(goapp_fyne.StrToColor("red"))
 	o1 := fyne_widget.NewTappedWith(c1, func() {
-		insp.Bind(c1)
+		insp.Bind(&Test1{})
 	})
 	o2 := fyne_widget.NewTappedWith(canvas.NewRectangle(goapp_fyne.StrToColor("green")), func() {
-		fmt.Println("Click me")
+		// insp.Bind(Test2{})
 	})
 	olist := []fyne.CanvasObject{
 		o1, o2,
