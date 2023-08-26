@@ -11,7 +11,7 @@ import (
 )
 
 func (this *DemoWindow) build_Tab_Inspector() fyne.CanvasObject {
-	insp := inspector.NewInspector(nil)
+	insp := inspector.NewInspector()
 	co := this.build_Tab_Inspector_Content(insp)
 	split := container.NewHSplit(co, insp)
 	split.Offset = 0.7
@@ -28,7 +28,7 @@ func (this *DemoWindow) build_Tab_Inspector_Content(insp *inspector.Inspector) f
 	l := container.NewGridWrap(fyne.NewSize(200, 100))
 	c1 := canvas.NewRectangle(goapp_fyne.StrToColor("red"))
 	o1 := fyne_widget.NewTappedWith(c1, func() {
-		insp.Bind(&Test1{})
+		insp.Bind(&Test1{}, "")
 	})
 	o2 := fyne_widget.NewTappedWith(canvas.NewRectangle(goapp_fyne.StrToColor("green")), func() {
 		// insp.Bind(Test2{})
