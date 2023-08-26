@@ -2,6 +2,8 @@ package inspector
 
 import (
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -21,10 +23,13 @@ var _ (fyne.Widget) = (*Inspector)(nil)
 type Inspector struct {
 	widget.BaseWidget
 
-	bindid int
-	items  []inspItem
-	form   *widget.Form
-	editor Editor
+	bindid     int
+	items      []inspItem
+	form       *widget.Form
+	toolbar    *fyne.Container
+	backButton *widget.Button
+	pathText   *widget.Label
+	editor     Editor
 }
 
 func NewInspector() *Inspector {
@@ -35,9 +40,21 @@ func NewInspector() *Inspector {
 	return o
 }
 
+func (this *Inspector) onBack() {
+
+}
+
 func (this *Inspector) CreateRenderer() fyne.WidgetRenderer {
+	this.backButton = widget.NewButtonWithIcon("", theme.NavigateBackIcon(), this.onBack)
+	this.pathText = widget.NewLabel("")
+	this.pathText.Wrapping = fyne.TextTruncate
+	c1 := container.NewHBox(this.backButton, this.pathText)
+	c2 := container.NewPadded(c1)
+	this.toolbar = c2
+	this.toolbar.Hide()
 	this.form = widget.NewForm()
-	return widget.NewSimpleRenderer(this.form)
+	co := container.NewVBox(c2, this.form)
+	return widget.NewSimpleRenderer(co)
 }
 
 func (this *Inspector) current() inspItem {
@@ -63,8 +80,16 @@ func (this *Inspector) showCurrent() {
 	this.form.Items = nil
 
 	item := this.current()
-	if !item.IsNil() {
+	if item.IsNil() {
+		this.toolbar.Hide()
+	} else {
 		item.editor.CreateInspectorGUI(this.form, item.label)
+		this.toolbar.Show()
+		if len(this.items) > 1 {
+			this.backButton.Enable()
+		} else {
+			this.backButton.Disable()
+		}
 	}
 	this.form.Refresh()
 }

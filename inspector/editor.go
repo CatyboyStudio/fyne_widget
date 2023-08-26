@@ -33,6 +33,9 @@ func CreateEditor(v any, n string) (Editor, error) {
 	if v == nil {
 		return nil, nil
 	}
+	if ed, ok := v.(Editor); ok {
+		return ed, nil
+	}
 	if n == "" {
 		typ := reflect.TypeOf(v)
 		n = reflext.TypeFullname(typ)
