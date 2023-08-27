@@ -11,12 +11,16 @@ type Property struct {
 	SetValue  func(any) error
 	GetString func() (string, error)
 	SetString func(v string) error
+	OnUpdate  func()
 }
+
+func none() {}
 
 func NewProperty(t string) *Property {
 	p := &Property{Title: t}
 	p.GetString = p.DefaultGetString
 	p.SetValue = p.DefaultSetValue
+	p.OnUpdate = none
 	return p
 }
 
@@ -27,6 +31,11 @@ func (p *Property) WithGetValue(f func() (any, error)) *Property {
 
 func (p *Property) WithSetValue(f func(any) error) *Property {
 	p.SetValue = f
+	return p
+}
+
+func (p *Property) WithOnUpdate(f func()) *Property {
+	p.OnUpdate = f
 	return p
 }
 

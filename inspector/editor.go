@@ -1,6 +1,7 @@
 package inspector
 
 import (
+	"cbsutil/collections"
 	"cbsutil/reflext"
 	"fmt"
 	"reflect"
@@ -15,7 +16,7 @@ type Editor struct {
 	Form      *widget.Form
 	closeC    chan bool
 	builder   EditorBuilder
-	watchers  []func()
+	watchers  collections.IdSlice[func()]
 }
 
 func (ed *Editor) CloseC() <-chan bool {
@@ -28,7 +29,7 @@ func (ed *Editor) close() {
 	ed.Form = nil
 	ed.builder = nil
 	ed.Data = nil
-	clear(ed.watchers)
+	ed.watchers.Clear()
 }
 
 func CreateEditor(ins *Inspector, v any, editorType string) (*Editor, error) {
@@ -58,11 +59,18 @@ func CreateEditor(ins *Inspector, v any, editorType string) (*Editor, error) {
 	return ed, nil
 }
 
+func (ed *Editor) Execute(f func()) {
+	ed.Inspector.Executor.Process(nil, func(a any) (any, error) {
+		f()
+		return nil, nil
+	})
+}
+
 const tickTime = time.Millisecond * 200
 
-func (ed *Editor) Watch(f func()) {
-	ed.watchers = append(ed.watchers, f)
-	if len(ed.watchers) == 1 {
+func (ed *Editor) Watch(f func()) int {
+	id := ed.watchers.Add(f)
+	if ed.watchers.Count() == 1 {
 		go func() {
 			tm := time.NewTimer(tickTime)
 			defer tm.Stop()
@@ -70,11 +78,10 @@ func (ed *Editor) Watch(f func()) {
 				select {
 				case <-tm.C:
 					if ed.Inspector != nil {
-						ed.Inspector.Executor.Process(nil, func(a any) (any, error) {
-							for _, w := range ed.watchers {
+						ed.Execute(func() {
+							for _, w := range ed.watchers.Data {
 								w()
 							}
-							return nil, nil
 						})
 						tm.Reset(tickTime)
 					}
@@ -84,4 +91,5 @@ func (ed *Editor) Watch(f func()) {
 			}
 		}()
 	}
+	return id
 }

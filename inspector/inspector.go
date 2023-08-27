@@ -25,6 +25,7 @@ var _ (fyne.Widget) = (*Inspector)(nil)
 
 type Inspector struct {
 	widget.BaseWidget
+	Window fyne.Window
 
 	bindid int
 	items  []inspItem
@@ -37,8 +38,9 @@ type Inspector struct {
 	Executor executor.Executor[any, any]
 }
 
-func NewInspector() *Inspector {
+func NewInspector(win fyne.Window) *Inspector {
 	o := &Inspector{
+		Window:   win,
 		Executor: executor.NewInline[any, any](),
 	}
 	o.ExtendBaseWidget(o)

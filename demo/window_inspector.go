@@ -11,7 +11,7 @@ import (
 )
 
 func (this *DemoWindow) build_Tab_Inspector() fyne.CanvasObject {
-	insp := inspector.NewInspector()
+	insp := inspector.NewInspector(this.win)
 	co := this.build_Tab_Inspector_Content(insp)
 	split := container.NewHSplit(co, insp)
 	split.Offset = 0.7
