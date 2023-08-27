@@ -1,6 +1,10 @@
 package inspector
 
 import (
+	"cbsutil/executor"
+	"log/slog"
+	"slices"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
@@ -10,8 +14,7 @@ import (
 type inspItem struct {
 	id     int
 	label  string
-	data   any
-	editor Editor
+	editor *Editor
 }
 
 func (o inspItem) IsNil() bool {
@@ -23,101 +26,111 @@ var _ (fyne.Widget) = (*Inspector)(nil)
 type Inspector struct {
 	widget.BaseWidget
 
-	bindid     int
-	items      []inspItem
+	bindid int
+	items  []inspItem
+
 	form       *widget.Form
 	toolbar    *fyne.Container
 	backButton *widget.Button
 	pathText   *widget.Label
-	editor     Editor
+
+	Executor executor.Executor[any, any]
 }
 
 func NewInspector() *Inspector {
 	o := &Inspector{
-		//
+		Executor: executor.NewInline[any, any](),
 	}
 	o.ExtendBaseWidget(o)
 	return o
 }
 
-func (this *Inspector) onBack() {
+func (th *Inspector) onBack() {
 
 }
 
-func (this *Inspector) CreateRenderer() fyne.WidgetRenderer {
-	this.backButton = widget.NewButtonWithIcon("", theme.NavigateBackIcon(), this.onBack)
-	this.pathText = widget.NewLabel("")
-	this.pathText.Wrapping = fyne.TextTruncate
-	c1 := container.NewHBox(this.backButton, this.pathText)
-	c2 := container.NewPadded(c1)
-	this.toolbar = c2
-	this.toolbar.Hide()
-	this.form = widget.NewForm()
-	co := container.NewVBox(c2, this.form)
+func (th *Inspector) CreateRenderer() fyne.WidgetRenderer {
+	th.backButton = widget.NewButtonWithIcon("", theme.NavigateBackIcon(), th.onBack)
+	rbt := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		th.showCurrent()
+	})
+	th.pathText = widget.NewLabel("")
+	th.pathText.Wrapping = fyne.TextTruncate
+	c1 := container.NewHBox(th.backButton, rbt)
+	c11 := container.NewBorder(nil, nil, c1, nil, th.pathText)
+	c2 := container.NewPadded(c11)
+	th.toolbar = c2
+	th.toolbar.Hide()
+	th.form = widget.NewForm()
+	co := container.NewVBox(c2, th.form)
 	return widget.NewSimpleRenderer(co)
 }
 
-func (this *Inspector) current() inspItem {
-	if len(this.items) > 0 {
-		return this.items[len(this.items)-1]
+func (th *Inspector) current() inspItem {
+	if len(th.items) > 0 {
+		return th.items[len(th.items)-1]
 	}
 	return inspItem{}
 }
 
-func (this *Inspector) pushItem(item inspItem) {
-	this.items = append(this.items, item)
+func (th *Inspector) pushItem(item inspItem) {
+	th.items = append(th.items, item)
 }
 
-func (this *Inspector) popItem() {
-	c := len(this.items)
+func (th *Inspector) popItem() {
+	c := len(th.items)
 	if c > 0 {
-		this.items[c-1] = inspItem{}
-		this.items = this.items[:c-1]
+		th.items[c-1].editor.close()
+		th.items = slices.Delete(th.items, c-1, c)
 	}
 }
 
-func (this *Inspector) showCurrent() {
-	this.form.Items = nil
+func (th *Inspector) showCurrent() {
+	th.form.Items = nil
+	th.form.Refresh()
 
-	item := this.current()
+	item := th.current()
 	if item.IsNil() {
-		this.toolbar.Hide()
+		th.toolbar.Hide()
 	} else {
-		item.editor.CreateInspectorGUI(this.form, item.label)
-		this.toolbar.Show()
-		if len(this.items) > 1 {
-			this.backButton.Enable()
+		item.editor.Form = th.form
+		err := item.editor.builder.BuildEditor(item.editor)
+		if err != nil {
+			slog.Error("Build editor fail", "editor", item.editor, "data", item.editor.Data, "error", err)
+		}
+		th.toolbar.Show()
+		if len(th.items) > 1 {
+			th.backButton.Enable()
 		} else {
-			this.backButton.Disable()
+			th.backButton.Disable()
 		}
 	}
-	this.form.Refresh()
+	th.form.Refresh()
 }
 
-func (this *Inspector) Bind(data any, editorType string) (int, error) {
-	ed, err := CreateEditor(data, editorType)
+func (th *Inspector) Bind(data any, editorType string) (int, error) {
+	ed, err := CreateEditor(th, data, editorType)
 	if err != nil {
 		return 0, err
 	}
-	this.bindid++
-	id := this.bindid
+	th.bindid++
+	id := th.bindid
 	item := inspItem{
 		id:     id,
-		data:   data,
 		editor: ed,
 	}
-	c := len(this.items)
+	c := len(th.items)
 	for i := 0; i < c; i++ {
-		this.popItem()
+		th.popItem()
 	}
-	this.pushItem(item)
-	this.showCurrent()
+	th.pushItem(item)
+	th.showCurrent()
 	return id, nil
 }
 
-func (this *Inspector) Unbind(id int) {
+func (th *Inspector) Unbind(id int) {
 	idx := -1
-	for i, v := range this.items {
+	for i, v := range th.items {
 		if v.id == id {
 			idx = i
 			break
@@ -126,26 +139,25 @@ func (this *Inspector) Unbind(id int) {
 	if idx == -1 {
 		return
 	}
-	for i := len(this.items) - 1; i >= idx; i-- {
-		this.popItem()
+	for i := len(th.items) - 1; i >= idx; i-- {
+		th.popItem()
 	}
-	this.showCurrent()
+	th.showCurrent()
 }
 
-func (this *Inspector) Push(label string, data any, editorType string) error {
-	ed, err := CreateEditor(data, editorType)
+func (th *Inspector) Push(label string, data any, editorType string) error {
+	ed, err := CreateEditor(th, data, editorType)
 	if err != nil {
 		return err
 	}
-	this.bindid++
-	id := this.bindid
+	th.bindid++
+	id := th.bindid
 	item := inspItem{
 		id:     id,
 		label:  label,
-		data:   data,
 		editor: ed,
 	}
-	this.pushItem(item)
-	this.showCurrent()
+	th.pushItem(item)
+	th.showCurrent()
 	return nil
 }

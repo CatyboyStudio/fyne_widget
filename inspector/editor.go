@@ -4,45 +4,84 @@ import (
 	"cbsutil/reflext"
 	"fmt"
 	"reflect"
+	"time"
 
 	"fyne.io/fyne/v2/widget"
 )
 
-type Editor interface {
-	CreateInspectorGUI(form *widget.Form, label string) error
+type Editor struct {
+	Data      any
+	Inspector *Inspector
+	Form      *widget.Form
+	closeC    chan bool
+	builder   EditorBuilder
+	watchers  []func()
 }
 
-type EditorFactory func(v any) (Editor, error)
-
-var editors map[string]EditorFactory = map[string]EditorFactory{}
-
-func RegisterEditorFactoryByType(typ reflect.Type, f EditorFactory) {
-	n := reflext.TypeFullname(typ)
-	RegisterEditorFactoryByName(n, f)
+func (ed *Editor) CloseC() <-chan bool {
+	return ed.closeC
 }
 
-func RegisterEditorFactoryByName(n string, f EditorFactory) {
-	editors[n] = f
+func (ed *Editor) close() {
+	close(ed.closeC)
+	ed.Inspector = nil
+	ed.Form = nil
+	ed.builder = nil
+	ed.Data = nil
+	clear(ed.watchers)
 }
 
-func GetEditorFactory(n string) EditorFactory {
-	return editors[n]
-}
-
-func CreateEditor(v any, n string) (Editor, error) {
+func CreateEditor(ins *Inspector, v any, editorType string) (*Editor, error) {
 	if v == nil {
 		return nil, nil
 	}
-	if ed, ok := v.(Editor); ok {
-		return ed, nil
+	var eb EditorBuilder
+	if o, ok := v.(EditorBuilder); ok {
+		eb = o
+	} else {
+		if editorType == "" {
+			typ := reflect.TypeOf(v)
+			editorType = reflext.TypeFullname(typ)
+		}
+		eb = GetEditorBuilder(editorType)
 	}
-	if n == "" {
-		typ := reflect.TypeOf(v)
-		n = reflext.TypeFullname(typ)
+	if eb == nil {
+		return nil, fmt.Errorf("miss Editor '%s'", editorType)
 	}
-	efac := GetEditorFactory(n)
-	if efac == nil {
-		return nil, fmt.Errorf("miss Editor '%s'", n)
+
+	ed := &Editor{
+		Inspector: ins,
+		Data:      v,
+		closeC:    make(chan bool),
+		builder:   eb,
 	}
-	return efac(v)
+	return ed, nil
+}
+
+const tickTime = time.Millisecond * 200
+
+func (ed *Editor) Watch(f func()) {
+	ed.watchers = append(ed.watchers, f)
+	if len(ed.watchers) == 1 {
+		go func() {
+			tm := time.NewTimer(tickTime)
+			defer tm.Stop()
+			for {
+				select {
+				case <-tm.C:
+					if ed.Inspector != nil {
+						ed.Inspector.Executor.Process(nil, func(a any) (any, error) {
+							for _, w := range ed.watchers {
+								w()
+							}
+							return nil, nil
+						})
+						tm.Reset(tickTime)
+					}
+				case <-ed.closeC:
+					return
+				}
+			}
+		}()
+	}
 }
